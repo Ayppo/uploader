@@ -12,6 +12,7 @@ import requests
 
 class Uploader(object):
     def __init__(self, cookie):
+        # TODO: 增加登录接口使用账号密码登陆
         self.MAX_RETRY_TIMES = 5
         self.profile = 'ugcupos/yb'
         self.cdn = 'ws'
@@ -97,16 +98,9 @@ class Uploader(object):
                 'end': offset + len(blob),
                 'total': filesize,
             }
-            times = 0
-            while times < self.MAX_RETRY_TIMES:
-                times += 1
-                try:
-                    response = requests.put(upload_url, params=params, data=blob, headers=upload_headers)
-                    break
-                except Exception:
-                    pass
-
+            response = requests.put(upload_url, params=params, data=blob, headers=upload_headers)
             print >> sys.stderr, 'UPLOAD CHUNK', chunk, ':', response.text
+
             parts_info['parts'].append({
                 'partNumber': chunk + 1,
                 'eTag': 'etag'
@@ -154,6 +148,7 @@ class Uploader(object):
             dynamic    : 分享动态, 比如："#周五##放假# 劳资明天不上班"
             no_reprint : 1表示不允许转载,0表示允许
         """
+        # TODO: 增加多P上传
         # 上传文件, 获取上传信息
         upload_info = self._upload(filepath)
         if not upload_info:
