@@ -8,17 +8,25 @@ import time
 import json
 import base64
 import requests
+from requests.adapters import HTTPAdapter
 
 
 class Uploader(object):
-    def __init__(self, cookie):
+    def __init__(self):
         # TODO: 增加登录接口使用账号密码登陆
-        self.MAX_RETRY_TIMES = 5
+        cookie = 'finger=edc6ecda; sid=knfjvm2n; stardustvideo=1; CURRENT_FNVAL=8; rpdid=iwxpsppxiwdoskxplpoww; '\
+                 'fts=1536494317; CURRENT_QUALITY=80; member_v2=1; LIVE_BUVID=bf021f79d618d82a9185a9e94b2ac87b; '\
+                 'LIVE_BUVID__ckMd5=119e906d758b1132; UM_distinctid=1660567fc7bce5-01bf5d1763c045-8383268-1fa400-1660567fc7c3b7; '\
+                 'DedeUserID=3867708; DedeUserID__ckMd5=24a621788d887ac6; SESSDATA=31c92c81%2C1540281029%2C741bc432; '\
+                 'bili_jct=fd0154f557d67360dea0a00dfebf7af7; pgv_pvi=3914371072; _dfcaptcha=854d0e7f6c4134ececc8ca612f69b46b; '\
+                 'bp_t_offset_3867708=167695254318052704; buvid3=096DDB4B-A946-4251-91E0-E516E06309C4163036infoc'
+        self.MAX_RETRYS = 5
         self.profile = 'ugcupos/yb'
         self.cdn = 'ws'
         self.csrf = re.search('bili_jct=(.*?);', cookie + ';').group(1)
         self.mid = re.search('DedeUserID=(.*?);', cookie + ';').group(1)
         self.session = requests.session()
+        self.session.mount('https://', HTTPAdapter(max_retries=self.MAX_RETRYS))
         self.session.headers['cookie'] = cookie
         self.session.headers['Accept'] = 'application/json, text/javascript, */*; q=0.01'
         self.session.headers['User-Agent'] = 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/57.0.2987.133 Safari/537.36'
@@ -28,6 +36,7 @@ class Uploader(object):
     def _upload(self, filepath):
         """执行上传文件操作"""
         if not os.path.isfile(filepath):
+            print >> sys.stderr, 'FILE NOT EXISTS:', filepath
             return
 
         filename = os.path.basename(filepath)
@@ -44,15 +53,8 @@ class Uploader(object):
             'upcdn': self.cdn,
             'profile': self.profile,
         }
-        times = 0
-        while times < self.MAX_RETRY_TIMES:
-            times += 1
-            try:
-                response = self.session.get(preupload_url, params=params)
-                upload_info = response.json()
-                break
-            except Exception:
-                pass
+        response = self.session.get(preupload_url, params=params)
+        upload_info = response.json()
 
         # 本次上传bilibili端文件名
         upload_info['bili_filename'] = upload_info['upos_uri'].split('/')[-1].split('.')[0]
@@ -60,20 +62,14 @@ class Uploader(object):
         endpoint = 'http:%s/' % upload_info['endpoint']
         upload_url = re.sub(r'^upos://', endpoint, upload_info['upos_uri'])
         print >> sys.stderr, 'UPLOAD URL:', upload_url
-        # 本次上传headers
-        upload_headers = {'X-Upos-Auth': upload_info['auth']}
+        # 本次上传session
+        upload_session = requests.session()
+        upload_session.mount('http://', HTTPAdapter(max_retries=self.MAX_RETRYS))
+        upload_session.headers['X-Upos-Auth'] = upload_info['auth']
 
         # 2.获取本次上传的upload_id
-        times = 0
-        while times < self.MAX_RETRY_TIMES:
-            times += 1
-            try:
-                response = requests.post(upload_url + '?uploads&output=json', headers=upload_headers)
-                upload_info['upload_id'] = response.json()['upload_id']
-                break
-            except Exception, e:
-                print str(e)
-                pass
+        response = upload_session.post(upload_url + '?uploads&output=json')
+        upload_info['upload_id'] = response.json()['upload_id']
 
         print >> sys.stderr, 'UPLOAD INFO:', upload_info
 
@@ -98,7 +94,7 @@ class Uploader(object):
                 'end': offset + len(blob),
                 'total': filesize,
             }
-            response = requests.put(upload_url, params=params, data=blob, headers=upload_headers)
+            response = upload_session.put(upload_url, params=params, data=blob)
             print >> sys.stderr, 'UPLOAD CHUNK', chunk, ':', response.text
 
             parts_info['parts'].append({
@@ -116,7 +112,7 @@ class Uploader(object):
             'uploadId': upload_info['upload_id'],
             'biz_id': upload_info['biz_id']
         }
-        response = requests.post(upload_url, params=params, data=parts_info, headers=upload_headers)
+        response = upload_session.post(upload_url, params=params, data=parts_info)
         print >> sys.stderr, 'UPLOAD RESULT:', response.text
 
         return upload_info
@@ -148,7 +144,10 @@ class Uploader(object):
             dynamic    : 分享动态, 比如："#周五##放假# 劳资明天不上班"
             no_reprint : 1表示不允许转载,0表示允许
         """
-        # TODO: 增加多P上传
+        # TODO:
+        # 1.增加多P上传
+        # 2.对已投稿视频进行删改, 包括删除投稿，修改信息，加P删P等
+
         # 上传文件, 获取上传信息
         upload_info = self._upload(filepath)
         if not upload_info:
@@ -157,6 +156,9 @@ class Uploader(object):
         cover_url = self._cover_up(cover_path) if cover_path else ''
         # 版权判断, 转载无版权
         copyright = 2 if source else 1
+        # tag设置
+        if isinstance(tag, list):
+            tag = ','.join(tag)
         # 设置视频基本信息
         params = {
             'copyright' : copyright,
@@ -180,14 +182,9 @@ class Uploader(object):
         url = 'https://member.bilibili.com/x/vu/web/add?csrf=' + self.csrf
         response = self.session.post(url, json=params)
         print >> sys.stderr, 'SET VIDEO INFO:', response.text
+        return response.json()
 
 
 if __name__ == '__main__':
-    cookie = 'finger=edc6ecda; sid=knfjvm2n; stardustvideo=1; CURRENT_FNVAL=8; rpdid=iwxpsppxiwdoskxplpoww; '\
-             'fts=1536494317; CURRENT_QUALITY=80; member_v2=1; LIVE_BUVID=bf021f79d618d82a9185a9e94b2ac87b; '\
-             'LIVE_BUVID__ckMd5=119e906d758b1132; UM_distinctid=1660567fc7bce5-01bf5d1763c045-8383268-1fa400-1660567fc7c3b7; '\
-             'DedeUserID=3867708; DedeUserID__ckMd5=24a621788d887ac6; SESSDATA=31c92c81%2C1540281029%2C741bc432; '\
-             'bili_jct=fd0154f557d67360dea0a00dfebf7af7; pgv_pvi=3914371072; _dfcaptcha=854d0e7f6c4134ececc8ca612f69b46b; '\
-             'bp_t_offset_3867708=167695254318052704; buvid3=096DDB4B-A946-4251-91E0-E516E06309C4163036infoc'
-    uper = Uploader(cookie)
+    uper = Uploader()
     uper.upload('Judd Trump.mkv', '特朗姆普的暴力美学', 163, '台球,斯诺克,特朗姆普', cover_path='Judd Trump.jpg')
