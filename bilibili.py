@@ -8,18 +8,14 @@ import time
 import json
 import base64
 import requests
+import argparse
 from requests.adapters import HTTPAdapter
 
 
 class Uploader(object):
     def __init__(self):
         # TODO: 增加登录接口使用账号密码登陆
-        cookie = 'finger=edc6ecda; sid=knfjvm2n; stardustvideo=1; CURRENT_FNVAL=8; rpdid=iwxpsppxiwdoskxplpoww; '\
-                 'fts=1536494317; CURRENT_QUALITY=80; member_v2=1; LIVE_BUVID=bf021f79d618d82a9185a9e94b2ac87b; '\
-                 'LIVE_BUVID__ckMd5=119e906d758b1132; UM_distinctid=1660567fc7bce5-01bf5d1763c045-8383268-1fa400-1660567fc7c3b7; '\
-                 'DedeUserID=3867708; DedeUserID__ckMd5=24a621788d887ac6; SESSDATA=31c92c81%2C1540281029%2C741bc432; '\
-                 'bili_jct=fd0154f557d67360dea0a00dfebf7af7; pgv_pvi=3914371072; _dfcaptcha=854d0e7f6c4134ececc8ca612f69b46b; '\
-                 'bp_t_offset_3867708=167695254318052704; buvid3=096DDB4B-A946-4251-91E0-E516E06309C4163036infoc'
+        cookie = '----------------请自行获取B站COOKIE--------------'
         self.MAX_RETRYS = 5
         self.profile = 'ugcupos/yb'
         self.cdn = 'ws'
@@ -131,7 +127,7 @@ class Uploader(object):
         response = self.session.post(url, data=data)
         return response.json()['data']['url']
 
-    def upload(self, filepath, title, tid, tag, desc='', source='', cover_path='', dynamic='', no_reprint=1):
+    def upload(self, filepath, title, tid, tag='', desc='', source='', cover_path='', dynamic='', no_reprint=1):
         """视频投稿
         Args:
             filepath   : 视频文件路径
@@ -186,5 +182,13 @@ class Uploader(object):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='上传bilibili视频')
+    parser.add_argument('-f', '--file', help='视频文件路径', required=True)
+    parser.add_argument('-t', '--title', help='标题', required=True)
+    parser.add_argument('-c', '--channel', type=int, help='频道id, 详见https://member.bilibili.com/x/web/archive/pre', required=True)
+    parser.add_argument('-T', '--tag', nargs='*', help='标签')
+    parser.add_argument('-C', '--cover', help='封面文件路径')
+    args = parser.parse_args()
+
     uper = Uploader()
-    uper.upload('Judd Trump.mkv', '特朗姆普的暴力美学', 163, '台球,斯诺克,特朗姆普', cover_path='Judd Trump.jpg')
+    uper.upload(args.file, args.title, args.channel, args.tag, args.cover)
