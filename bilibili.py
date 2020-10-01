@@ -67,7 +67,7 @@ class Uploader(object):
         response = upload_session.post(upload_url + '?uploads&output=json')
         upload_info['upload_id'] = response.json()['upload_id']
 
-        print >> sys.stderr, 'UPLOAD INFO:', upload_info
+        print(sys.stderr, 'UPLOAD INFO:', upload_info)
 
         # 3.分块上传文件
         CHUNK_SIZE = 4 * 1024 * 1024
@@ -91,7 +91,7 @@ class Uploader(object):
                 'total': filesize,
             }
             response = upload_session.put(upload_url, params=params, data=blob)
-            print >> sys.stderr, 'UPLOAD CHUNK', chunk, ':', response.text
+            print('Uploading...',math.floor(chunk / total_chunks  * 100), '%  UPLOAD CHUNK', chunk, ':', response.text)
 
             parts_info['parts'].append({
                 'partNumber': chunk + 1,
@@ -109,7 +109,7 @@ class Uploader(object):
             'biz_id': upload_info['biz_id']
         }
         response = upload_session.post(upload_url, params=params, data=parts_info)
-        print >> sys.stderr, 'UPLOAD RESULT:', response.text
+        print(sys.stderr, 'UPLOAD RESULT:', response.text)
 
         return upload_info
 
