@@ -32,7 +32,7 @@ class Uploader(object):
     def _upload(self, filepath):
         """执行上传文件操作"""
         if not os.path.isfile(filepath):
-            print >> sys.stderr, 'FILE NOT EXISTS:', filepath
+            print('FILE NOT EXISTS:', filepath, file=sys.stderr)
             return
 
         filename = os.path.basename(filepath)
@@ -57,7 +57,7 @@ class Uploader(object):
         # 本次上传url
         endpoint = 'http:%s/' % upload_info['endpoint']
         upload_url = re.sub(r'^upos://', endpoint, upload_info['upos_uri'])
-        print >> sys.stderr, 'UPLOAD URL:', upload_url
+        print('UPLOAD URL:', upload_url, file=sys.stderr)
         # 本次上传session
         upload_session = requests.session()
         upload_session.mount('http://', HTTPAdapter(max_retries=self.MAX_RETRYS))
@@ -67,7 +67,7 @@ class Uploader(object):
         response = upload_session.post(upload_url + '?uploads&output=json')
         upload_info['upload_id'] = response.json()['upload_id']
 
-        print(sys.stderr, 'UPLOAD INFO:', upload_info)
+        print('UPLOAD INFO:', upload_info, file=sys.stderr)
 
         # 3.分块上传文件
         CHUNK_SIZE = 4 * 1024 * 1024
@@ -91,7 +91,7 @@ class Uploader(object):
                 'total': filesize,
             }
             response = upload_session.put(upload_url, params=params, data=blob)
-            print('Uploading...',math.floor(chunk / total_chunks  * 100), '%  UPLOAD CHUNK', chunk, ':', response.text)
+            print('Uploading...',math.floor(chunk / total_chunks  * 100), '%  UPLOAD CHUNK', chunk, ':', response.text, file=sys.stderr)
 
             parts_info['parts'].append({
                 'partNumber': chunk + 1,
@@ -109,7 +109,7 @@ class Uploader(object):
             'biz_id': upload_info['biz_id']
         }
         response = upload_session.post(upload_url, params=params, data=parts_info)
-        print(sys.stderr, 'UPLOAD RESULT:', response.text)
+        print('UPLOAD RESULT:', response.text, file=sys.stderr)
 
         return upload_info
 
@@ -177,7 +177,7 @@ class Uploader(object):
             del params['no_reprint']
         url = 'https://member.bilibili.com/x/vu/web/add?csrf=' + self.csrf
         response = self.session.post(url, json=params)
-        print >> sys.stderr, 'SET VIDEO INFO:', response.text
+        print('SET VIDEO INFO:', response.text, file=sys.stderr)
         return response.json()
 
 
