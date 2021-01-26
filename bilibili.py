@@ -127,7 +127,7 @@ class Uploader(object):
         response = self.session.post(url, data=data)
         return response.json()['data']['url']
 
-    def upload(self, filepath, title, tid, tag='', desc='', source='', cover_path='', dynamic='', no_reprint=1):
+    def upload(self, filepath, title, tid, tag='', desc='', source='', cover_path='', dynamic='', no_reprint=1, electric=1):
         """视频投稿
         Args:
             filepath   : 视频文件路径
@@ -139,6 +139,7 @@ class Uploader(object):
             cover_path : 封面图片路径
             dynamic    : 分享动态, 比如："#周五##放假# 劳资明天不上班"
             no_reprint : 1表示不允许转载,0表示允许
+            electric   : 1表示开启充电面板,0表示不允许
         """
         # TODO:
         # 1.增加多P上传
@@ -171,7 +172,8 @@ class Uploader(object):
                 'filename': upload_info['bili_filename'],
                 'title'   : title,
                 'desc'    : '',
-            }]
+            }],
+            'open_elec': electric
         }
         if source:
             del params['no_reprint']
